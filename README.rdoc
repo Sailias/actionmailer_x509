@@ -65,17 +65,15 @@ your ActionMailer model.
     class FooMailer < ActionMailer::Base
 
       def sending_method(email, from , subject = "Empty subject for signed")
-        # If you want to sign the mail
-        x509_sign  true
-        x509_sign_cert  "certs/yourwebsite.crt"
-        x509_sign_key   "certs/yourwebsite.key"
-        # In case your certificate has a passphrase
-        x509_sign_passphrase "my passphrase for the certificate"
-        # If you want to crypt the mail
-        x509_crypt  true
-        x509_crypt_cert  "certs/crypt.crt"
-        # In case you want to set non DES cipher
-        x509_crypt_cipher "AES-128-CBC"
+        self.x509_settings = {
+          sign: true,
+          p12: "config/your.p12",
+          passphrase: "",
+          crypt: true,
+          crypt_cert: "config/your.pem",
+          crypt_cipher: "AES-128-CBC",
+          ca_cert: "config/ca.crt"
+        }
 
         mail(:subject => subject, :to => email, :from => from)
       end
