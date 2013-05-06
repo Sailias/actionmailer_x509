@@ -79,11 +79,18 @@ module ActionMailer #:nodoc:
       end
 
       # We load certificate and private key
-      if should_sign?
-        sign_p12 = OpenSSL::PKCS12.new(File.read(@x509_settings[:p12]), @x509_settings[:passphrase])
+      if @x509_settings[:sign]
+        if @x509_settings[:p12]
+          sign_p12 = OpenSSL::PKCS12.new(File.read(@x509_settings[:p12]), @x509_settings[:passphrase])
 
-        sign_cert = sign_p12.certificate
-        sign_prv_key = sign_p12.key
+          sign_cert = sign_p12.certificate
+          sign_prv_key = sign_p12.key
+        elsif @x509_settings[:sign_cert] && @x509_settings[:sign_key]
+          sign_cert = OpenSSL::X509::Certificate.new( File::read(@x509_settings[:sign_cert]) )
+          sign_prv_key = OpenSSL::PKey::RSA.new( File::read(@x509_settings[:sign_key]), @x509_settings[:passphrase])
+        else
+          logger.info "X509 signing required, but no certificate and key files configured"
+        end
       end
 
       if should_crypt?
@@ -94,7 +101,7 @@ module ActionMailer #:nodoc:
       # Sign and crypt the mail
       # NOTE: the one following line is the slowest part of this code, signing is sloooow
       p7 = mail.encoded
-      p7 = OpenSSL::PKCS7.sign(sign_cert, sign_prv_key, p7, [ca_cert || nil], OpenSSL::PKCS7::DETACHED) if should_sign?
+      p7 = OpenSSL::PKCS7.sign(sign_cert, sign_prv_key, p7, [ca_cert || nil], OpenSSL::PKCS7::DETACHED) if sign_cert && sign_prv_key
       p7 = OpenSSL::PKCS7.encrypt([crypt_cert], (should_sign? ? OpenSSL::PKCS7::write_smime(p7) : p7), cipher, nil) if should_crypt?
       smime0 = OpenSSL::PKCS7::write_smime(p7)
 
@@ -114,11 +121,8 @@ module ActionMailer #:nodoc:
 
     protected
 
-    # Shall we sign the mail?
     def should_sign?
-      sign = @x509_settings[:sign] && @x509_settings[:p12]
-      logger.info "X509 signing required, but no certificate and key files configured" unless sign
-      sign
+      @x509_settings[:p12] || (@x509_settings[:sign_cert] && @x509_settings[:sign_key])
     end
 
     # Shall we crypt the mail?
